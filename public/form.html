@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>打刻フォーム</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>打刻フォーム</h1>
+    <a class="nav-link" href="index.html">← 社員一覧へ</a>
+
+    <p id="error-msg"></p>
+    <p id="result-msg"></p>
+
+    <div class="punch-panel">
+      <div class="form-row">
+        <select id="employee-select"></select>
+      </div>
+      <div class="punch-buttons">
+        <button id="clock-in-btn">出勤</button>
+        <button id="clock-out-btn">退勤</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const EMPLOYEES_API = '/api/employees';
+    const ATTENDANCE_API = '/api/attendance';
+
+    function showError(msg) {
+      const el = document.getElementById('error-msg');
+      el.textContent = msg;
+      document.getElementById('result-msg').textContent = '';
+      setTimeout(() => { el.textContent = ''; }, 3000);
+    }
+
+    function showResult(msg) {
+      const el = document.getElementById('result-msg');
+      el.textContent = msg;
+      document.getElementById('error-msg').textContent = '';
+      setTimeout(() => { el.textContent = ''; }, 3000);
+    }
+
+    // 社員一覧を取得してセレクトボックスに反映する
+    async function loadEmployeeOptions() {
+      try {
+        const res = await fetch(EMPLOYEES_API);
+        if (!res.ok) throw new Error('社員一覧の取得に失敗しました');
+        const employees = await res.json();
+        const select = document.getElementById('employee-select');
+        select.innerHTML = '';
+        if (employees.length === 0) {
+          const opt = document.createElement('option');
+          opt.textContent = '社員が登録されていません';
+          opt.disabled = true;
+          select.appendChild(opt);
+          return;
+        }
+        employees.forEach((emp) => {
+          const opt = document.createElement('option');
+          opt.value = emp.id;
+          opt.textContent = `${emp.name}（${emp.employee_number}）`;
+          select.appendChild(opt);
+        });
+      } catch (err) {
+        showError(err.message);
+      }
+    }
+
+    function getSelectedEmployeeId() {
+      const select = document.getElementById('employee-select');
+      return select.value ? Number(select.value) : null;
+    }
+
+    async function punch(endpoint, successLabel) {
+      const employeeId = getSelectedEmployeeId();
+      if (!employeeId) {
+        showError('社員を選択してください');
+        return;
+      }
+      try {
+        const res = await fetch(`${ATTENDANCE_API}/${endpoint}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ employee_id: employeeId }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || `${successLabel}に失敗しました`);
+        }
+        showResult(`${successLabel}を記録しました`);
+      } catch (err) {
+        showError(err.message);
+      }
+    }
+
+    document.getElementById('clock-in-btn').addEventListener('click', () => punch('clock-in', '出勤'));
+    document.getElementById('clock-out-btn').addEventListener('click', () => punch('clock-out', '退勤'));
+
+    loadEmployeeOptions();
+  </script>
+</body>
+</html>

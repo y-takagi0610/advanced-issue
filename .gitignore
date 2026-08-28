@@ -1,0 +1,4 @@
+node_modules/
+.env
+coverage/
+.claude/scheduled_tasks.lock

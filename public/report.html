@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>月次レポート</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>月次レポート</h1>
+    <a class="nav-link" href="index.html">← 社員一覧へ</a>
+
+    <p id="error-msg"></p>
+
+    <div class="punch-panel">
+      <div class="form-row">
+        <select id="employee-select"></select>
+        <input type="number" id="year-input" placeholder="年（例: 2026）" min="2000" max="2100" />
+        <select id="month-select"></select>
+        <button id="show-report-btn">表示</button>
+      </div>
+
+      <dl id="report-result" class="report-result" hidden>
+        <div class="report-row">
+          <dt>出勤日数</dt>
+          <dd id="attended-days"></dd>
+        </div>
+        <div class="report-row">
+          <dt>遅刻回数</dt>
+          <dd id="late-count"></dd>
+        </div>
+        <div class="report-row">
+          <dt>総勤務時間</dt>
+          <dd id="total-work-hours"></dd>
+        </div>
+      </dl>
+    </div>
+  </div>
+
+  <script>
+    const EMPLOYEES_API = '/api/employees';
+
+    function showError(msg) {
+      const el = document.getElementById('error-msg');
+      el.textContent = msg;
+      setTimeout(() => { el.textContent = ''; }, 3000);
+    }
+
+    // 社員一覧を取得してセレクトボックスに反映する
+    async function loadEmployeeOptions() {
+      try {
+        const res = await fetch(EMPLOYEES_API);
+        if (!res.ok) throw new Error('社員一覧の取得に失敗しました');
+        const employees = await res.json();
+        const select = document.getElementById('employee-select');
+        select.innerHTML = '';
+        if (employees.length === 0) {
+          const opt = document.createElement('option');
+          opt.textContent = '社員が登録されていません';
+          opt.disabled = true;
+          select.appendChild(opt);
+          return;
+        }
+        employees.forEach((emp) => {
+          const opt = document.createElement('option');
+          opt.value = emp.id;
+          opt.textContent = `${emp.name}（${emp.employee_number}）`;
+          select.appendChild(opt);
+        });
+      } catch (err) {
+        showError(err.message);
+      }
+    }
+
+    // 月選択セレクトボックスに1〜12月を設定する
+    function initMonthOptions() {
+      const select = document.getElementById('month-select');
+      for (let m = 1; m <= 12; m += 1) {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = `${m}月`;
+        select.appendChild(opt);
+      }
+      select.value = new Date().getMonth() + 1;
+    }
+
+    function getSelectedEmployeeId() {
+      const select = document.getElementById('employee-select');
+      return select.value ? Number(select.value) : null;
+    }
+
+    function renderReport(report) {
+      document.getElementById('attended-days').textContent = `${report.attended_days}日`;
+      document.getElementById('late-count').textContent = `${report.late_count}回`;
+      document.getElementById('total-work-hours').textContent = `${report.total_work_hours}時間`;
+      document.getElementById('report-result').hidden = false;
+    }
+
+    async function loadReport() {
+      const employeeId = getSelectedEmployeeId();
+      const year = document.getElementById('year-input').value;
+      const month = document.getElementById('month-select').value;
+
+      if (!employeeId) {
+        showError('社員を選択してください');
+        return;
+      }
+      if (!year || !month) {
+        showError('年と月を入力してください');
+        return;
+      }
+
+      try {
+        const res = await fetch(`${EMPLOYEES_API}/${employeeId}/monthly-report?year=${year}&month=${month}`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || 'レポートの取得に失敗しました');
+        }
+        renderReport(data);
+      } catch (err) {
+        showError(err.message);
+      }
+    }
+
+    document.getElementById('show-report-btn').addEventListener('click', loadReport);
+
+    initMonthOptions();
+    loadEmployeeOptions();
+  </script>
+</body>
+</html>

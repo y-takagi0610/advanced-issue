@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>社員一覧</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>社員一覧</h1>
+    <a class="nav-link" href="form.html">打刻フォームへ →</a>
+    <a class="nav-link" href="report.html">月次レポートへ →</a>
+
+    <p id="error-msg"></p>
+
+    <form id="add-form" class="form-row">
+      <input type="text" id="new-name" placeholder="氏名" maxlength="100" />
+      <input type="text" id="new-employee-number" placeholder="社員番号" maxlength="50" />
+      <input type="text" id="new-department" placeholder="所属（任意）" maxlength="100" />
+      <button type="submit">登録</button>
+    </form>
+
+    <ul id="employee-list"></ul>
+  </div>
+
+  <script>
+    const API = '/api/employees';
+
+    function showError(msg) {
+      const el = document.getElementById('error-msg');
+      el.textContent = msg;
+      setTimeout(() => { el.textContent = ''; }, 3000);
+    }
+
+    // 社員一覧を取得してDOMに描画する
+    async function loadEmployees() {
+      try {
+        const res = await fetch(API);
+        if (!res.ok) throw new Error('一覧の取得に失敗しました');
+        const employees = await res.json();
+        renderEmployees(employees);
+      } catch (err) {
+        showError(err.message);
+      }
+    }
+
+    function renderEmployees(employees) {
+      const list = document.getElementById('employee-list');
+      list.innerHTML = '';
+      employees.forEach((emp) => {
+        const li = document.createElement('li');
+
+        const info = document.createElement('div');
+        info.className = 'info';
+        const name = document.createElement('div');
+        name.className = 'name';
+        name.textContent = emp.name;
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.textContent = `${emp.employee_number}${emp.department ? ' / ' + emp.department : ''}`;
+        info.append(name, meta);
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'danger';
+        deleteBtn.textContent = '削除';
+        deleteBtn.addEventListener('click', () => deleteEmployee(emp.id));
+
+        li.append(info, deleteBtn);
+        list.appendChild(li);
+      });
+    }
+
+    // 社員を新規登録する
+    async function addEmployee(name, employeeNumber, department) {
+      try {
+        const res = await fetch(API, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, employee_number: employeeNumber, department: department || undefined }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || '登録に失敗しました');
+        }
+        await loadEmployees();
+      } catch (err) {
+        showError(err.message);
+      }
+    }
+
+    // 社員を削除する
+    async function deleteEmployee(id) {
+      try {
+        const res = await fetch(`${API}/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('削除に失敗しました');
+        await loadEmployees();
+      } catch (err) {
+        showError(err.message);
+      }
+    }
+
+    document.getElementById('add-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('new-name').value.trim();
+      const employeeNumber = document.getElementById('new-employee-number').value.trim();
+      const department = document.getElementById('new-department').value.trim();
+      if (!name || !employeeNumber) {
+        showError('氏名と社員番号を入力してください');
+        return;
+      }
+      await addEmployee(name, employeeNumber, department);
+      document.getElementById('new-name').value = '';
+      document.getElementById('new-employee-number').value = '';
+      document.getElementById('new-department').value = '';
+    });
+
+    loadEmployees();
+  </script>
+</body>
+</html>
