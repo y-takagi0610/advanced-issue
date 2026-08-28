@@ -11,14 +11,15 @@
 
 ## 画面一覧
 
-C-前半では研修PDF記載のテーマB最小要件に合わせ、以下2画面のみを実装する。
+C-前半では研修PDF記載のテーマB最小要件に合わせ、2画面（index.html, form.html）のみを実装した。C-後半でAgent Teamsにより月次レポート画面を追加した。
 
 | 画面名 | 主な操作 |
 |---|---|
-| 社員一覧画面（index.html） | 社員リスト表示・社員登録・削除 |
+| 社員一覧画面（index.html） | 社員リスト表示・社員登録・削除。打刻フォーム・月次レポートへのリンクあり |
 | 打刻フォーム（form.html） | 社員選択・出勤/退勤ボタン |
+| 月次レポート画面（report.html、C-後半で追加） | 社員・年月を選択し、出勤日数・遅刻回数・総勤務時間を表示する |
 
-休暇申請・月次サマリー（勤務表画面）は要件3・4・5としてAPIは実装するが、C-前半では画面を作らずcurlでの動作確認に留める。月次レポート画面（`public/report.html`）はC-後半で追加する想定。
+休暇申請・月次サマリー（勤務表画面）は要件3・4・5としてAPIは実装しているが、画面は用意せずcurlでの動作確認に留めている。
 
 ## APIエンドポイント一覧
 
@@ -30,12 +31,11 @@ C-前半では研修PDF記載のテーマB最小要件に合わせ、以下2画�
 | DELETE | `/api/employees/:id` | 社員を削除する |
 | GET | `/api/attendance?employee_id=&year=&month=` | 指定社員・月の打刻一覧を取得する（勤務表画面） |
 | POST | `/api/attendance/clock-in` | 出勤打刻を登録する |
-| POST | `/api/attendance/clock-out` | 退勤打刻を登録する |
+| POST | `/api/attendance/clock-out` | 退勤打刻を登録する。body: `{ employee_id, clock_out_at? }`（`clock_out_at`任意、省略時はサーバー時刻。明示時は出勤時刻より前でないか検証する。C-後半で拡張） |
 | GET | `/api/employees/:id/summary?year=&month=` | 指定月の勤務時間集計・出勤/欠勤/休暇日数を取得する |
+| GET | `/api/employees/:id/monthly-report?year=&month=` | 指定月の出勤日数・遅刻回数・総勤務時間を取得する（C-後半で追加）。`late_count`は始業時刻9:00(JST)基準 |
 | GET | `/api/leave-requests?employee_id=` | 休暇申請一覧を取得する |
 | POST | `/api/leave-requests` | 休暇申請を登録する |
-
-※C-後半で追加予定の「月次レポートAPI」は `/api/employees/:id/monthly-report` という別パスとし、上記`summary`とは役割を分ける。
 
 ## DBテーブル設計
 
