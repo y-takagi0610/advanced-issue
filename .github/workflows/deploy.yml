@@ -1,0 +1,65 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: コードをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: EC2 へ SSH デプロイ
+        env:
+          EC2_KEY:      ${{ secrets.EC2_KEY }}
+          EC2_HOST:     ${{ secrets.EC2_HOST }}
+          EC2_USER:     ${{ secrets.EC2_USER }}
+          DB_HOST:      ${{ secrets.DB_HOST }}
+          DB_PORT:      ${{ secrets.DB_PORT }}
+          DB_NAME:      ${{ secrets.DB_NAME }}
+          DB_USER:      ${{ secrets.DB_USER }}
+          DB_PASSWORD:  ${{ secrets.DB_PASSWORD }}
+        run: |
+          if [ -z "$EC2_HOST" ] || [ -z "$EC2_KEY" ] || [ -z "$EC2_USER" ]; then
+            echo "⚠️ EC2 シークレットが未設定のためデプロイをスキップします"
+            exit 0
+          fi
+
+          echo "$EC2_KEY" > deploy.pem
+          chmod 600 deploy.pem
+
+          ssh -o StrictHostKeyChecking=no -i deploy.pem ${EC2_USER}@${EC2_HOST} \
+          "DB_HOST='${DB_HOST}' DB_PORT='${DB_PORT}' DB_NAME='${DB_NAME}' DB_USER='${DB_USER}' DB_PASSWORD='${DB_PASSWORD}' bash -s" << 'ENDSSH'
+          set -e
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+          cd ~/kintai-app
+
+          if [ -d ".git" ]; then
+            git remote set-url origin https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }}.git
+            git fetch origin main
+            git reset --hard origin/main
+          else
+            git clone https://github.com/${{ github.repository }}.git .
+          fi
+
+          npm ci
+
+          printf 'DB_HOST=%s\nDB_PORT=%s\nDB_NAME=%s\nDB_USER=%s\nDB_PASSWORD=%s\nPORT=3001\n' \
+          "${DB_HOST}" "${DB_PORT}" "${DB_NAME}" "${DB_USER}" "${DB_PASSWORD}" > .env
+          chmod 600 .env
+
+          pm2 restart kintai-app --update-env 2>/dev/null || pm2 start src/index.js --name kintai-app
+          pm2 save
+
+          echo "✅ デプロイ完了: $(date)"
+          ENDSSH
+
+          rm -f deploy.pem
